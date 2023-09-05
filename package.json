@@ -1,0 +1,12 @@
+{
+  "name": "fitnesstracker",
+  "version": "1.0.0",
+  "description": "This is a web app that allows you to track your fitness goals",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
