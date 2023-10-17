@@ -24,8 +24,24 @@ app.get('/', (req, res) =>{
     res.send(`<button ><a href="/api/workouts""> workouts </a> </button> <button ><a href="/api/workouts/add""> add workouts </a> </button> `)
 })
 
-app.get('/api/workouts', (req,res) =>{
-    res.render("workouts.ejs", {workouts})
+app.get('/api/workouts', async (req,res) =>{
+
+  try{
+    const delayedData = new Promise((resolve,reject) =>{
+        setTimeout(()=>{
+            // resolve(workouts);
+            reject("I don't want to work anymore");
+        }, 2000)
+        })
+
+        const result = await delayedData;
+        res.render("workouts.ejs", {workouts:result})
+  } catch(error){
+      console.log(error);
+    res.status(500).send(`${error}`);
+
+  }
+
 })
 
 app.get('/api/workouts/add', (req,res) =>{
