@@ -1,36 +1,23 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
+import Exercises from './components/exercises'
 
 function App() {
+  useEffect(()=>{
+    document.title = `${Exercises.length}`
 
-  const [exercises, setExercises] = useState([]);
-  const [newExercise, setNewExercise] = useState('');
+  })
 
-  const handleSumbit = (e) =>{
-    e.preventDefault();
-    setExercises([...exercises, newExercise]);
-    setNewExercise('');
-  }
+  console.log(Exercises);
+
 
   return(
     <div>
-      <h1>Fitness Tracker</h1>
-
-      <form onSubmit={handleSumbit}>
-        <input type='text'
-        placeholder='type an exercise'
-        value={newExercise}
-        onChange={(e)=>setNewExercise(e.target.value)}></input>
-
-        <button type='submit'>Add Exercise</button>
-      </form>
-      <ul>
-        {exercises.map((exercise,index)=> (
-          <li key={index}>{exercise}</li>
-        ))}
-      </ul>
+      <h1> Fitness Tracker </h1>
+      <h2>By Dor</h2>
+      <p>add your exercises here to track you Fitness behaviour</p>
+      <Exercises />
     </div>
   )
-
 }
 
 
