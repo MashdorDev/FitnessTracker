@@ -1,47 +1,47 @@
-const express = require('express');
+import express from 'express';
 const app = express();
 const port = 3000;
-const methodOverride = require('method-override');
+import methodOverride from 'method-override';
+import {MongoClient} from 'mongodb';
 
 app.use(express.urlencoded());
 app.use(express.json());
 app.set('view engine', 'ejs');
 app.use(methodOverride('_method'));
 
+const uri = "mongodb://localhost:27017/"
+
+let db;
+
+(async function(){
+    try{
+        const client = await MongoClient.connect(uri,{useUnifiedTopology: true});
+        console.log("Connected to MongoDB");
+        db = client.db('fitnessTracker');
+
+    } catch(err){
+        console.error('Error occurred while connecting to MongoDB:', err);
+    }
+})();
+
 app.use((req,res,next) =>{
 console.log(`${req.method} request for ${req.url}`);
 next()
 })
-
-
-const workouts = [
-    { id: 1, name: 'Pushups' },
-    { id: 2, name: 'Situps' },
-    { id: 3, name: 'Jogging' },
-]
 
 app.get('/', (req, res) =>{
     res.send(`<button ><a href="/api/workouts""> workouts </a> </button> <button ><a href="/api/workouts/add""> add workouts </a> </button> `)
 })
 
 app.get('/api/workouts', async (req,res) =>{
-
-  try{
-    const delayedData = new Promise((resolve,reject) =>{
-        setTimeout(()=>{
-            // resolve(workouts);
-            reject("I don't want to work anymore");
-        }, 2000)
-        })
-
-        const result = await delayedData;
-        res.render("workouts.ejs", {workouts:result})
-  } catch(error){
-      console.log(error);
-    res.status(500).send(`${error}`);
-
-  }
-
+    try{
+        const collection = db.collection('workouts');
+        const workouts = await collection.find({}).toArray();
+        res.render('workouts', {workouts})
+    } catch(err){
+        console.error(err);
+        res.status(500).send('Error fetching from database');
+    }
 })
 
 app.get('/api/workouts/add', (req,res) =>{
@@ -54,17 +54,24 @@ app.get('/api/workouts/add/:id', (req,res) =>{
 })
 
 app.post('/api/workouts', (req, res)=>{
+    const {name} = req.body;
 
-    console.log(req.body.name);
+    const newWorkout = {
+        name
+    }
 
-    const newWorkout ={
-    id:workouts.length + 1,
-    name: req.body.name
-    };
+    const collection = db.collection('workouts');
 
-    workouts.push(newWorkout);
-    res.redirect('/api/workouts');
+    collection.insertOne(newWorkout, (err, result) =>{
+        if(err){
+            console.error(err);
+            res.status(500).send('Error saving to database');
+            return
+        }
+        console.log("Saved to database");
 
+    })
+    res.redirect('/api/workouts')
 })
 
 
