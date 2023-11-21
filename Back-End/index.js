@@ -3,26 +3,25 @@ const app = express();
 const port = 3000;
 import methodOverride from 'method-override';
 import {MongoClient} from 'mongodb';
+import mongoose from 'mongoose';
 
 app.use(express.urlencoded());
 app.use(express.json());
 app.set('view engine', 'ejs');
 app.use(methodOverride('_method'));
 
-const uri = "mongodb://localhost:27017/"
+const uri = "mongodb://localhost:27017/fitnessTracker"
 
-let db;
+mongoose
+.connect(uri, {useNewUrlParser: true, useUnifiedTopology: true})
+.then(()=> console.log("connected to MongoDB using Mongoose"))
+.catch(err => console.log("Could not connect to MongoDB", err));
 
-(async function(){
-    try{
-        const client = await MongoClient.connect(uri,{useUnifiedTopology: true});
-        console.log("Connected to MongoDB");
-        db = client.db('fitnessTracker');
+const workoutSchema = new mongoose.Schema({
+    name: String
+})
 
-    } catch(err){
-        console.error('Error occurred while connecting to MongoDB:', err);
-    }
-})();
+const Workout = mongoose.model('workout', workoutSchema)
 
 app.use((req,res,next) =>{
 console.log(`${req.method} request for ${req.url}`);
@@ -34,13 +33,13 @@ app.get('/', (req, res) =>{
 })
 
 app.get('/api/workouts', async (req,res) =>{
-    try{
-        const collection = db.collection('workouts');
-        const workouts = await collection.find({}).toArray();
+    try {
+        const workouts = await Workout.find();
+        console.log(workouts);
         res.render('workouts', {workouts})
-    } catch(err){
-        console.error(err);
-        res.status(500).send('Error fetching from database');
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Error fetching from database')
     }
 })
 
@@ -48,30 +47,25 @@ app.get('/api/workouts/add', (req,res) =>{
     res.render('workoutForm.ejs');
 })
 
-// we will continue this on thusday
 app.get('/api/workouts/add/:id', (req,res) =>{
     res.render('updateWorkout.ejs');
 })
 
-app.post('/api/workouts', (req, res)=>{
+app.post('/api/workouts', async (req, res)=>{
     const {name} = req.body;
 
-    const newWorkout = {
+    const workout = new Workout({
         name
+    });
+
+    try {
+        const result = await workout.save();
+        console.log("saved to the database", result);
+        res.redirect('/api/workouts');
+    } catch (err) {
+        console.log(err);
+        res.status(500).send('Error saving to database');
     }
-
-    const collection = db.collection('workouts');
-
-    collection.insertOne(newWorkout, (err, result) =>{
-        if(err){
-            console.error(err);
-            res.status(500).send('Error saving to database');
-            return
-        }
-        console.log("Saved to database");
-
-    })
-    res.redirect('/api/workouts')
 })
 
 
