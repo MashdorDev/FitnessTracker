@@ -18,7 +18,7 @@ app.use(session({
     secret: process.env.SECRET,
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: true }
+    cookie: { secure: false }
   }))
 
 app.use(passport.initialize());
@@ -33,11 +33,12 @@ mongoose
 
 passport.use(new LocalStrategy(
     async(username, password, done) =>{
-        const user = await User.findOne({user:username})
+         const user = await User.findOne({ username: username })
+         console.log(user);
         if(!user || !bcrypt.compareSync(password, user.password)){
             return done(null, false, { message: 'Incorrect username or password.' })
         }
-        return(null,user);
+        return done(null, user);
     }
 ))
 
@@ -45,11 +46,14 @@ passport.serializeUser((user,done)=>{
     done(null,user.id);
 })
 
-passport.deserializeUser((id,done) =>{
-    User.findById(id, (err,user)=>{
-        done(err,user);
-    })
-})
+passport.deserializeUser((id, done) => {
+    User.findById(id).then(user => {
+        done(null, user);
+    }).catch(err => {
+        done(err);
+    });
+});
+
 
 const userSchema = new mongoose.Schema({
     username: String,
@@ -63,7 +67,6 @@ const workoutSchema = new mongoose.Schema({
 
 const Workout = mongoose.model('workout', workoutSchema)
 
-let loggedUser;
 
 app.use((req,res,next) =>{
 console.log(`${req.method} request for ${req.url}`);
@@ -71,7 +74,7 @@ next()
 })
 
 app.get('/', (req, res) =>{
-res.render('index',{user})
+res.render('index',{user: req.user})
 })
 
 app.get('/register', (req, res)=>{
@@ -80,9 +83,9 @@ app.get('/register', (req, res)=>{
 
 app.post('/register', async(req,res)=>{
     try{
-        const hasedPassword = bcrypt.hashSync(req.body.password, 10);
+        const hashedPassword = bcrypt.hashSync(req.body.password, 10);
 
-        const newUser = new User({username:req.body.username, password: hasedPassword});
+        const newUser = new User({username:req.body.username, password: hashedPassword});
         await newUser.save()
         res.redirect('/login');
     }catch(error){
@@ -95,16 +98,18 @@ app.get('/login', (req, res)=>{
     res.render('login')
 });
 
-app.post('/login', passport.authenticate('local', {failureRedirect:'/login',failureMessage: true} ), (res, req)=>{
-    loggedUser = req.user;
-    console.log(loggedUser);
-    res.redirect('/~' + req.user.username);
+app.post('/login', passport.authenticate('local', {failureRedirect:'/login',failureMessage: true, successMessage:true} ), (req, res)=>{
+    console.log(req.user);
+    res.redirect('/' );
 })
 
-app.get('/logout', (req, res)=>{
-    req.logOut();
-    res.redirect('/login')
-})
+app.get('/logout', (req, res) => {
+    req.logout(function(err) {
+        if (err) { return next(err); }
+        res.redirect('/');
+    });
+});
+
 
 app.get('/api/workouts', async (req,res) =>{
     try {
