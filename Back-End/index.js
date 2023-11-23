@@ -1,14 +1,28 @@
 import express from 'express';
+import methodOverride from 'method-override';
+import mongoose from 'mongoose';
+import passport from 'passport';
+import { Strategy as LocalStrategy } from 'passport-local';
+import bcrypt from 'bcryptjs';
+import session from 'express-session';
+import 'dotenv/config'
 const app = express();
 const port = 3000;
-import methodOverride from 'method-override';
-import {MongoClient} from 'mongodb';
-import mongoose from 'mongoose';
 
 app.use(express.urlencoded());
 app.use(express.json());
 app.set('view engine', 'ejs');
 app.use(methodOverride('_method'));
+console.log(process.env.SECRET);
+app.use(session({
+    secret: process.env.SECRET,
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: true }
+  }))
+
+app.use(passport.initialize());
+app.use(passport.session())
 
 const uri = "mongodb://localhost:27017/fitnessTracker"
 
@@ -17,11 +31,39 @@ mongoose
 .then(()=> console.log("connected to MongoDB using Mongoose"))
 .catch(err => console.log("Could not connect to MongoDB", err));
 
+passport.use(new LocalStrategy(
+    async(username, password, done) =>{
+        const user = await User.findOne({user:username})
+        if(!user || !bcrypt.compareSync(password, user.password)){
+            return done(null, false, { message: 'Incorrect username or password.' })
+        }
+        return(null,user);
+    }
+))
+
+passport.serializeUser((user,done)=>{
+    done(null,user.id);
+})
+
+passport.deserializeUser((id,done) =>{
+    User.findById(id, (err,user)=>{
+        done(err,user);
+    })
+})
+
+const userSchema = new mongoose.Schema({
+    username: String,
+    password: String
+  });
+const User = mongoose.model('User', userSchema);
+
 const workoutSchema = new mongoose.Schema({
     name: String
 })
 
 const Workout = mongoose.model('workout', workoutSchema)
+
+let loggedUser;
 
 app.use((req,res,next) =>{
 console.log(`${req.method} request for ${req.url}`);
@@ -29,7 +71,39 @@ next()
 })
 
 app.get('/', (req, res) =>{
-    res.send(`<button ><a href="/api/workouts""> workouts </a> </button> <button ><a href="/api/workouts/add""> add workouts </a> </button> `)
+res.render('index',{user})
+})
+
+app.get('/register', (req, res)=>{
+    res.render('register');
+})
+
+app.post('/register', async(req,res)=>{
+    try{
+        const hasedPassword = bcrypt.hashSync(req.body.password, 10);
+
+        const newUser = new User({username:req.body.username, password: hasedPassword});
+        await newUser.save()
+        res.redirect('/login');
+    }catch(error){
+        console.error(error, "Error has accrued while registering");
+        res.redirect('/register')
+    }
+})
+
+app.get('/login', (req, res)=>{
+    res.render('login')
+});
+
+app.post('/login', passport.authenticate('local', {failureRedirect:'/login',failureMessage: true} ), (res, req)=>{
+    loggedUser = req.user;
+    console.log(loggedUser);
+    res.redirect('/~' + req.user.username);
+})
+
+app.get('/logout', (req, res)=>{
+    req.logOut();
+    res.redirect('/login')
 })
 
 app.get('/api/workouts', async (req,res) =>{
