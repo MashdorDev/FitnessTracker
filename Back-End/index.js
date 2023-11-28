@@ -6,8 +6,15 @@ import { Strategy as LocalStrategy } from 'passport-local';
 import bcrypt from 'bcryptjs';
 import session from 'express-session';
 import 'dotenv/config'
+import jwt from 'jsonwebtoken';
+import cors from 'cors';
+
+
+
 const app = express();
 const port = 3000;
+
+app.use(cors());
 
 app.use(express.urlencoded());
 app.use(express.json());
@@ -54,6 +61,31 @@ passport.deserializeUser((id, done) => {
     });
 });
 
+const ensureAuthenticated = (req, res, next) => {
+    if (req.isAuthenticated()) {
+        return next();
+    }
+    res.redirect('/login');
+};
+
+const verifyToken = (req, res, next) => {
+    console.log(req);
+    const token = req.header('Authorization')?.split(' ')[1] || sessionStorage.getItem('token') ;
+
+    if (!token) {
+        return res.redirect('/login');
+    }
+
+    try {
+        const verified = jwt.verify(token, process.env.SECRET);
+        req.user = verified;
+        next();
+    }
+    catch (err) {
+        res.status(400).send('Invalid Token');
+    }
+};
+
 
 const userSchema = new mongoose.Schema({
     username: String,
@@ -99,7 +131,10 @@ app.get('/login', (req, res)=>{
 });
 
 app.post('/login', passport.authenticate('local', {failureRedirect:'/login',failureMessage: true, successMessage:true} ), (req, res)=>{
-    console.log(req.user);
+    const token = jwt.sign({id: req.user.id}, process.env.SECRET,{expiresIn: '1h'});
+
+
+    res.header('Authorization', `Bearer ${token}`);
     res.redirect('/' );
 })
 
@@ -111,7 +146,7 @@ app.get('/logout', (req, res) => {
 });
 
 
-app.get('/api/workouts', async (req,res) =>{
+app.get('/api/workouts' ,async (req,res) =>{
     try {
         const workouts = await Workout.find();
         console.log(workouts);
@@ -122,7 +157,7 @@ app.get('/api/workouts', async (req,res) =>{
     }
 })
 
-app.get('/api/workouts/add', (req,res) =>{
+app.get('/api/workouts/add', ensureAuthenticated ,(req,res) =>{
     res.render('workoutForm.ejs');
 })
 
@@ -148,11 +183,11 @@ app.post('/api/workouts', async (req, res)=>{
 })
 
 
-app.post('/api/workouts/delete/:id', (req,res)=>{
+app.post('/api/workouts/delete/:id', ensureAuthenticated ,async (req,res)=>{
 
 const workoutId = parseInt(req.params.id);
 
-const index = workouts.findIndex(w => w.id === workoutId);
+const index = await Workout.findIndex(w => w.id === workoutId);
 
 if(index !==-1){
     workouts.splice(index,1);
